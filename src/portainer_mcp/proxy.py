@@ -247,6 +247,30 @@ def register(mcp: FastMCP, client: httpx.AsyncClient, *, read_only: bool) -> Non
         return _apply_select(text, select)
 
     @mcp.tool(
+        name="container_recreate",
+        annotations=proxy_annotations,
+        description=(
+            "Recreate a container using Portainer's native recreate endpoint "
+            "(same action as the UI Recreate button, with optional forced image pull)."
+        ),
+    )
+    async def container_recreate(
+        environment_id: Annotated[int, Field(description="Portainer environment ID")],
+        container_id: Annotated[str, Field(description="Container ID")],
+        pull_image: Annotated[bool, Field(description="Force pull the latest image before recreating")] = True,
+    ) -> str:
+        if read_only:
+            raise ValueError("only GET requests are allowed in read-only mode")
+        _validate_path(f"/containers/{container_id}/recreate")
+        url = f"/docker/{environment_id}/containers/{container_id}/recreate"
+        response = await client.post(url, json={"PullImage": pull_image})
+        if response.is_error:
+            raise ToolError(
+                f"recreate failed (HTTP {response.status_code}): {response.text[:2000]}"
+            )
+        return response.text
+
+    @mcp.tool(
         name="kubernetes_proxy",
         annotations=proxy_annotations,
         description=(
